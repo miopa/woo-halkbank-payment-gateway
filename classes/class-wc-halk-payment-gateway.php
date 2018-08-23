@@ -207,7 +207,7 @@ class WC_Halk_Payment_Gateway extends WC_Payment_Gateway {
 	 * @return void
 	 */
 	protected function get_display_3d_form(){
-		ob_clean();
+		ob_start();
 		$this->display_3d_form();
 		return ob_get_clean();
 	}
