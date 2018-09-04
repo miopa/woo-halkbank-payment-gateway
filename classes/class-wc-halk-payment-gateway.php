@@ -29,11 +29,11 @@ class WC_Halk_Payment_Gateway extends WC_Payment_Gateway {
 		// Define user set variables.
 		$this->title        = $this->get_option( 'title' );
 		$this->description  = $this->get_option( 'description' );
-		$this->client_id  = $this->get_option( 'client_id' );
-		$this->store_key  = $this->get_option( 'store_key' );
-		
-
-		add_action( 'woocommerce_api_wc_gateway_tebank', array( $this, 'check_tebank_response' ) );
+		$this->client_id    = $this->get_option( 'client_id' );
+		$this->store_key    = $this->get_option( 'store_key' );
+		$this->username     = $this->get_option( 'username' );
+		$this->password     = $this->get_option( 'password' );
+		$this->status_transaction     = $this->get_option( 'status_transaction', 'yes' ) == 'yes' ? 1 : 0;
 
 		// Actions.
 		add_action( 'woocommerce_update_options_payment_gateways_' . $this->id, array( $this, 'process_admin_options' ) );
@@ -51,11 +51,16 @@ class WC_Halk_Payment_Gateway extends WC_Payment_Gateway {
 
 		$this->form_fields = apply_filters( 'wc_halk_form_fields', 
 			array(
-
 				'enabled' => array(
 					'title'   => __( 'Enable/Disable', 'halk-payment-gateway-for-woocommerce' ),
 					'type'    => 'checkbox',
 					'label'   => __( 'Enable Halk Bank Payment', 'halk-payment-gateway-for-woocommerce' ),
+					'default' => 'yes'
+				),
+				'status_transaction' => array(
+					'title'   => __( 'Status Transactions', 'halk-payment-gateway-for-woocommerce' ),
+					'type'    => 'checkbox',
+					'label'   => __( 'Enable status transactions ( needed by the bank to enable live environment )', 'halk-payment-gateway-for-woocommerce' ),
 					'default' => 'yes'
 				),
 				'title' => array(
@@ -76,6 +81,20 @@ class WC_Halk_Payment_Gateway extends WC_Payment_Gateway {
 					'title'       => __( 'Client ID', 'halk-payment-gateway-for-woocommerce' ),
 					'type'        => 'text',
 					'description' => __( 'You need to ask your bank processor for this value.', 'halk-payment-gateway-for-woocommerce' ),
+					'default'     => __( '000000000', 'halk-payment-gateway-for-woocommerce' ),
+					'desc_tip'    => true,
+				),
+				'username' => array(
+					'title'       => __( 'Username', 'halk-payment-gateway-for-woocommerce' ),
+					'type'        => 'text',
+					'description' => __( 'You need to ask your bank processor for this value. Used only for status transaction', 'halk-payment-gateway-for-woocommerce' ),
+					'default'     => __( '000000000', 'halk-payment-gateway-for-woocommerce' ),
+					'desc_tip'    => true,
+				),
+				'password' => array(
+					'title'       => __( 'Password', 'halk-payment-gateway-for-woocommerce' ),
+					'type'        => 'password',
+					'description' => __( 'You need to ask your bank processor for this value. Used only for status transaction', 'halk-payment-gateway-for-woocommerce' ),
 					'default'     => __( '000000000', 'halk-payment-gateway-for-woocommerce' ),
 					'desc_tip'    => true,
 				),
@@ -159,6 +178,9 @@ class WC_Halk_Payment_Gateway extends WC_Payment_Gateway {
 					if ( $Response == "Approved") {
 						// Your payment is approved.;
 						$order->payment_complete();
+						if( $this->status_transaction ) {
+							$order->add_order_note( $this->make_test_status_transaction( $order_id ) );
+						}
 						$return_url = $this->get_return_url( $order );
 					} else {
 						$order->add_order_note( __( 'Your payment is not approved.', 'halk-payment-gateway-for-woocommerce' ) );
@@ -176,6 +198,45 @@ class WC_Halk_Payment_Gateway extends WC_Payment_Gateway {
 			wc_add_notice( __( 'Hash values error. Please check parameters posted to 3D secure page.', 'halk-payment-gateway-for-woocommerce' ), 'error' );
 		}
 		wp_safe_redirect( $return_url );
+	}
+
+	protected function make_test_status_transaction( $order_id ) {
+		$clientid = $this->store_key;
+		$name = $this->username;
+		$password = $this->password;
+		print_r($_REQUEST);
+		$oid= $order_id;
+		
+		$request= "DATA=<?xml version=\"1.0\" encoding=\"ISO-8859-9\"?>
+		<CC5Request>
+		<Name>{$name}</Name>
+		<Password>{$password}</Password>
+		<ClientId>{$clientid}</ClientId>
+		<OrderId>{$order_id}</OrderId>	
+		<Mode>P</Mode>
+		<Extra><ORDERSTATUS>QUERY</ORDERSTATUS></Extra>
+		</CC5Request>";
+		echo $request;
+		
+		$url = "https://entegrasyon.asseco-see.com.tr/fim/api";
+		$ch = curl_init();								
+		curl_setopt($ch, CURLOPT_URL,$url);				
+		curl_setopt($ch, CURLOPT_RETURNTRANSFER,1);		
+		curl_setopt($ch, CURLOPT_TIMEOUT, 90);			
+		curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+		curl_setopt($ch, CURLOPT_POSTFIELDS, $request);
+		
+		$result = curl_exec($ch);
+		
+		if (curl_errno($ch)) 
+		{
+			print curl_error($ch);
+		} 
+		else 
+		{
+			curl_close($ch);
+		}
+		return $result;	
 	}
 
 	/**
@@ -226,7 +287,7 @@ class WC_Halk_Payment_Gateway extends WC_Payment_Gateway {
 				$order = wc_get_order( $order_id );
 				$failUrl = $okUrl = get_site_url() . '/?wc-api=' . esc_attr( $this->id ) . '&order=' . $order_id;
 				$clientId = $this->client_id;		//Merchant Id defined by bank to user
-				$amount = $order->get_total();	//Transaction amount
+				$amount = apply_filters( 'halk_amount_fix', $order->get_total() ); //Transaction amount
 				$oid = $order_id;				//Order Id. Must be unique. If left blank, system will generate a unique one.
 				// $oid = '';				     //Order Id. Must be unique. If left blank, system will generate a unique one.
 				$rnd = microtime();				//A random number, such as date/time

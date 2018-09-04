@@ -31,4 +31,6 @@ This plugin allows your store to make payments via Halk Bank payment service.
 The text domain is `halk-payment-gateway-for-woocommerce`.
 
 == Changelog ==
+1.1 Add filter support for currency switcher. Filter name halk_amount_fix
+1.0.1 Fix bug with older versions
 1.0 Initial version.
