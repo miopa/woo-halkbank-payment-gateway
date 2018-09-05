@@ -6,7 +6,7 @@
  *
  * @class 		WC_Halk_Payment_Gateway
  * @extends		WC_Payment_Gateway
- * @version		1.1.0
+ * @version		1.1.1
  * @package		WooCommerce/Classes/Payment
  * @author 		Mitko Kockovski
  */
@@ -37,7 +37,6 @@ class WC_Halk_Payment_Gateway extends WC_Payment_Gateway {
 
 		// Actions.
 		add_action( 'woocommerce_update_options_payment_gateways_' . $this->id, array( $this, 'process_admin_options' ) );
-
 		// 3D functions.
 		add_action( 'woocommerce_api_' . $this->id, array( $this, 'secure_3d_process_response' ), 10, 1 );
 		add_action( 'wp_footer', array( $this, 'add_3d_container_to_footer' ) );
@@ -201,10 +200,10 @@ class WC_Halk_Payment_Gateway extends WC_Payment_Gateway {
 	}
 
 	protected function make_test_status_transaction( $order_id ) {
+
 		$clientid = $this->store_key;
 		$name = $this->username;
 		$password = $this->password;
-		print_r($_REQUEST);
 		$oid= $order_id;
 		
 		$request= "DATA=<?xml version=\"1.0\" encoding=\"ISO-8859-9\"?>
@@ -216,7 +215,6 @@ class WC_Halk_Payment_Gateway extends WC_Payment_Gateway {
 		<Mode>P</Mode>
 		<Extra><ORDERSTATUS>QUERY</ORDERSTATUS></Extra>
 		</CC5Request>";
-		echo $request;
 		
 		$url = "https://entegrasyon.asseco-see.com.tr/fim/api";
 		$ch = curl_init();								
@@ -228,12 +226,9 @@ class WC_Halk_Payment_Gateway extends WC_Payment_Gateway {
 		
 		$result = curl_exec($ch);
 		
-		if (curl_errno($ch)) 
-		{
+		if (curl_errno($ch)) {
 			print curl_error($ch);
-		} 
-		else 
-		{
+		} else {
 			curl_close($ch);
 		}
 		return $result;	
@@ -245,9 +240,7 @@ class WC_Halk_Payment_Gateway extends WC_Payment_Gateway {
 	 */
 	public function add_3d_container_to_footer(){
 		?>
-		<div class="<?php echo esc_attr( $this->id ); ?>-3d-secure-form-container">
-			
-		</div>
+		<div class="<?php echo esc_attr( $this->id ); ?>-3d-secure-form-container"></div>
 		<?php
 	}
 
@@ -287,7 +280,7 @@ class WC_Halk_Payment_Gateway extends WC_Payment_Gateway {
 				$order = wc_get_order( $order_id );
 				$failUrl = $okUrl = get_site_url() . '/?wc-api=' . esc_attr( $this->id ) . '&order=' . $order_id;
 				$clientId = $this->client_id;		//Merchant Id defined by bank to user
-				$amount = apply_filters( 'halk_amount_fix', $order->get_total() ); //Transaction amount
+				$amount = number_format( apply_filters( 'halk_amount_fix', $order->get_total() ),  2, '.', '' );  //Transaction amount
 				$oid = $order_id;				//Order Id. Must be unique. If left blank, system will generate a unique one.
 				// $oid = '';				     //Order Id. Must be unique. If left blank, system will generate a unique one.
 				$rnd = microtime();				//A random number, such as date/time

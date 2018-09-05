@@ -6,7 +6,7 @@
 - Tested up to: 4.9.8
 - Requires WooCommerce at least: 3.2
 - Tested WooCommerce up to: 3.4
-- Stable Tag: 1.1
+- Stable Tag: 1.1.1
 - License: GPLv3
 - Requires PHP: 5.2.4
 - License URI: http://www.gnu.org/licenses/gpl-3.0.html
@@ -31,6 +31,12 @@ This plugin allows your store to make payments via Halk Bank payment service.
 The text domain is `halk-payment-gateway-for-woocommerce`.
 
 == Changelog ==
+1.1.1 Clean some code.
 1.1 Add filter support for currency switcher. Filter name halk_amount_fix
+Example for EUR to MKD
+add_filter( 'halk_amount_fix', 'switch_currencies' );
+function switch_currencies( $amount ) {
+	return number_format( $amount * 61.5, 2, '.', ''  );
+}
 1.0.1 Fix bug with older versions
 1.0 Initial version.

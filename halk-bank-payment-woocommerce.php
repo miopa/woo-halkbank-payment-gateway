@@ -5,7 +5,7 @@
  * Description: Implements the Halk bank payment gateway.
  * Author: Mitko Kockovski
  * Author URI: http://www.kockovski.com/
- * Version: 1.1
+ * Version: 1.1.1
  * Text Domain: halk-payment-gateway-for-woocommerce
  * Domain Path: /i18n/languages/
  *
