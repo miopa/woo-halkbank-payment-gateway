@@ -1,6 +1,6 @@
 === Halk Bank Payment Gateway For Woocommerce ===
 
-- Contributors: m1tk00
+- Contributors: m1tk00, webpigment
 - Tags: woocommerce, payment gateway, gateway, manual payment
 - Requires at least: 3.8
 - Tested up to: 4.9.8
