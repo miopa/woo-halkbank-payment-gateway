@@ -1,17 +1,20 @@
-=== Halk Bank Payment Gateway For Woocommerce ===
+=== Halk Bank Payment Gateway For Woocommerce  - not functional after 15.03.2024 ===
 
 - Contributors: m1tk00, webpigment
 - Tags: woocommerce, payment gateway, gateway, manual payment
 - Requires at least: 3.8
-- Tested up to: 5.1
+- Tested up to: 6.4.3
 - Requires WooCommerce at least: 3.2
-- Tested WooCommerce up to: 3.5.7
-- Stable Tag: 1.2
+- Tested WooCommerce up to: 8.4.0
+- Stable Tag: 1.2.1
 - License: GPLv3
 - Requires PHP: 5.2.4
 - License URI: http://www.gnu.org/licenses/gpl-3.0.html
 
 == Description ==
+
+> **Notice of Code Deprecation**
+> Due to change in the hash version, we regret to inform you that the code within this plugin will no longer be functional after 15.03.2024.
 
 > **Requires: WooCommerce 2.1+**
 
