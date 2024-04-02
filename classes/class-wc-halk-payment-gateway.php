@@ -25,7 +25,7 @@ class WC_Halk_Payment_Gateway extends WC_Payment_Gateway {
 		// Define gateway params
 		$this->store_type         = '3D_PAY_HOSTING';
 		$this->hash_alg           = 'ver3';
-		$this->currency_code      = '807'; // Currency code, ISO_4217 standard
+		$this->currency_code      = '807'; // MKD, ISO_4217 standard
 		// Load the settings.
 		$this->init_form_fields();
 		$this->init_settings();
@@ -38,7 +38,7 @@ class WC_Halk_Payment_Gateway extends WC_Payment_Gateway {
 		$this->username     = $this->get_option( 'username' );
 		$this->password     = $this->get_option( 'password' );
 		$this->refresh_time = $this->get_option( 'refresh_time', '10' );
-		$this->status_transaction     = $this->get_option( 'status_transaction', 'yes' ) == 'yes' ? 1 : 0;
+		//$this->status_transaction     = $this->get_option( 'status_transaction', 'yes' ) === 'yes';
 		$this->transaction_type       = $this->get_option( 'transaction_type', 'Auth' );
 
 		// Actions.
@@ -68,19 +68,19 @@ class WC_Halk_Payment_Gateway extends WC_Payment_Gateway {
 					'label'   => __( 'Testing the integration', 'halk-payment-gateway-for-woocommerce' ),
 					'default' => 'no'
 				),
-				'transaction_type'   => array(
-					'name'    => __( 'Transaction type', 'woocommerce' ),
-					'id'      => 'transaction_type',
-					'css'     => 'min-width:150px;',
-					'std'     => 'Auth', // WooCommerce < 2.0
-					'default' => 'Auth', // WooCommerce >= 2.0
+				'transaction_type' => array(
+					'label'   => __( 'Transaction type', 'woocommerce' ),
 					'type'    => 'select',
 					'options' => array(
 						'Auth'        => __( 'Capture', 'woocommerce' ),
 						'PreAuth'     => __( 'Authorization', 'woocommerce' ),
 					),
+					'default'     => 'Auth',
+					'description' => __( 'Use “Authorization” to allocate (reserve) funds, “Capture” for actual transfer', 'halk-payment-gateway-for-woocommerce' ),
+					'desc_tip'    => true,
 				),
 				'status_transaction' => array(
+					'description' => 'Not used currently',
 					'title'   => __( 'Status Transactions', 'halk-payment-gateway-for-woocommerce' ),
 					'type'    => 'checkbox',
 					'label'   => __( 'Enable status transactions ( needed by the bank to enable live environment )', 'halk-payment-gateway-for-woocommerce' ),
@@ -150,12 +150,11 @@ class WC_Halk_Payment_Gateway extends WC_Payment_Gateway {
 		// $order = wc_get_order( $order_id );
 		wc_add_notice( __( 'Redirecting to payment page.', 'halk-payment-gateway-for-woocommerce' ), 'success' );
 		WC()->session->set( $this->id . '_order_id', $order_id );
-		$return = array(
-			'result' 	=> 'success',
+		return array(
+			'result' => 'success',
 			'refresh' => true,
-			'messages' => "\n\t<div class=\"woocommerce-message\" role=\"alert\">" . __('Redirecting to payment page.', 'halk-payment-gateway-for-woocommerce')  . "</div>\n\t",
+			'messages' => "\n\t<div class=\"woocommerce-message\" role=\"alert\">" . __('Redirecting to payment page.', 'halk-payment-gateway-for-woocommerce') . "</div>\n\t",
 		);
-		return $return;
 	}
 
 	/**
@@ -174,7 +173,7 @@ class WC_Halk_Payment_Gateway extends WC_Payment_Gateway {
 		}
 		$return_url = get_permalink( wc_get_page_id( 'checkout' ) );
 
-		if ( $order_id === $_POST["oid"] ) {
+		if ( $order_id == $_POST["oid"] ) {
 			$order = wc_get_order( $order_id );
 
 			/** hash ver3
@@ -190,7 +189,7 @@ class WC_Halk_Payment_Gateway extends WC_Payment_Gateway {
 			$params = array();
 			$ignored = array( 'hash', 'encoding', 'countdown' );
 			foreach ( $_POST as $key => $value ) {
-				if ( !in_array( strtolower( $key ), $ignored ) ) {
+				if ( ! in_array( strtolower( $key ), $ignored ) ) {
 					// '|' and '\' in the value have to be escaped
 					array_push( $params, str_replace( array( "\\", "|" ), array( "\\\\", "\\|" ), $value ) );
 				}
@@ -204,14 +203,20 @@ class WC_Halk_Payment_Gateway extends WC_Payment_Gateway {
 				wc_add_notice( __( 'Something went wrong. Please contact us for more details.', 'halk-payment-gateway-for-woocommerce' ), 'error' );
 				// echo __( 'Security warning. Hash values mismatch.', 'halk-payment-gateway-for-woocommerce' );
 			} else {
+				/** Possible `mdStatus` values:
+				 * 1 = Authenticated transaction (Full 3D)
+				 * 2, 3, 4 = Card not participating or attempt (Half 3D)
+				 * 5, 6, 7, 8 = Authentication not available or system error
+				 * 0 = Authentication failed
+				 */
 				if ( in_array( $_POST['mdStatus'], array( '1', '2', '3', '4' ), true ) ) {
-					// echo 3D Authentication is successful.;
+					// Possible `Response` values: “Approved”, “Declined” or “Error”
 					if ( $_POST["Response"] === "Approved" ) {
-						// Your payment is approved.;
 						$order->payment_complete();
-						if( $this->status_transaction ) {
+						/* this makes no sense, skip for now
+						if ( $this->status_transaction ) {
 							$order->add_order_note( $this->make_test_status_transaction( $order_id ) );
-						}
+						}*/
 						$return_url = $this->get_return_url( $order );
 					} else {
 						$order->add_order_note( __( 'Your payment is not approved.', 'halk-payment-gateway-for-woocommerce' ) );
@@ -315,7 +320,6 @@ class WC_Halk_Payment_Gateway extends WC_Payment_Gateway {
 				 $rnd = microtime();				//A random number, such as date/time
 				 //$lang = 'en';					//Language parameter, 'tr' for Turkish (default), 'en' for English
 				 //$instalment = '';				//Instalment count, if there's no instalment should left blank
-				 $transactionType = 'Auth';		//transaction type
 
 				/** hash ver3
 				 *
@@ -325,16 +329,15 @@ class WC_Halk_Payment_Gateway extends WC_Payment_Gateway {
 				 * Note: parameters “hash” and “encoding” are ignored.
 				 */
 				//fields: amount | clientid | currency | failUrl | hashAlgorithm | islemtipi | oid | okUrl | refreshtime | rnd | storetype
-				$params = array( $amount, $this->client_id, $this->currency_code, $failUrl, $this->hash_alg, $transactionType, $order_id, $okUrl, $this->refresh_time, $rnd, $this->store_type, $this->store_key );
+				$params = array( $amount, $this->client_id, $this->currency_code, $failUrl, $this->hash_alg, $this->transaction_type, $order_id, $okUrl, $this->refresh_time, $rnd, $this->store_type, $this->store_key );
 				$hash = base64_encode( pack( 'H*', hash( 'sha512', implode( '|', $params ) ) ) );
 				 ?>
-			   <form name="form" id="<?php echo $this->id ; ?>-3d-secure-form" action="<?php echo $this->payment_url; ?>"
-			         method="POST">
+			   <form name="form" id="<?php echo $this->id; ?>-3d-secure-form" action="<?php echo $this->payment_url; ?>" method="POST">
 				   <div>
 					   <input type="hidden" name="hashAlgorithm" value="<?php echo $this->hash_alg; ?>" />
 					   <input type="hidden" name="clientid" value="<?php echo $this->client_id; ?>" />
 					   <input type="hidden" name="amount" value="<?php echo $amount; ?>" />
-					   <input type="hidden" name="islemtipi" value="<?php echo $transactionType; ?>" />
+					   <input type="hidden" name="islemtipi" value="<?php echo $this->transaction_type; ?>" />
 					   <!--input type="hidden" name="taksit" value="<?php //echo $instalment; ?>" /-->
 					   <input type="hidden" name="oid" value="<?php echo $order_id; ?>" />
 					   <input type="hidden" name="okUrl" value="<?php echo $okUrl; ?>" />
@@ -347,10 +350,10 @@ class WC_Halk_Payment_Gateway extends WC_Payment_Gateway {
 					   <input type="hidden" name="currency" value="<?php echo $this->currency_code; ?>" />
 					   <input type="hidden" name="refreshtime" value="<?php echo $this->refresh_time; ?>" />
 				   </div>
-				   <script>
-					   jQuery('#<?php echo $this->id ; ?>-3d-secure-form').submit();
-				   </script>
 			   </form>
+			   <script>
+				   document.getElementById('<?php echo $this->id; ?>-3d-secure-form').submit();
+			   </script>
 			 <?php } ?>
 	    </div>
 		<?php
