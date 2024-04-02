@@ -1,3 +1,7 @@
+=== Forked from official Wordpress plugin repo at version 1.2.1 ===
+
+SVN source: https://plugins.svn.wordpress.org/woo-halkbank-payment-gateway/
+
 === Halk Bank Payment Gateway For Woocommerce  - not functional after 15.03.2024 ===
 
 - Contributors: m1tk00, webpigment
@@ -34,13 +38,15 @@ This plugin allows your store to make payments via Halk Bank payment service.
 The text domain is `halk-payment-gateway-for-woocommerce`.
 
 == Changelog ==
-1.2 Add live/test mode. Add transaction type.
-1.1.1 Clean some code.
-1.1 Add filter support for currency switcher. Filter name halk_amount_fix
+- 1.2 Add live/test mode. Add transaction type.
+- 1.1.1 Clean some code.
+- 1.1 Add filter support for currency switcher. Filter name `halk_amount_fix`  
 Example for EUR to MKD
+```
 add_filter( 'halk_amount_fix', 'switch_currencies' );
 function switch_currencies( $amount ) {
 	return number_format( $amount * 61.5, 2, '.', ''  );
 }
-1.0.1 Fix bug with older versions
-1.0 Initial version.
+```
+- 1.0.1 Fix bug with older versions
+- 1.0 Initial version.
