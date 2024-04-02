@@ -160,32 +160,35 @@ class WC_Halk_Payment_Gateway extends WC_Payment_Gateway {
 		} else {
 			$order_id = WC()->session->get( $this->id . '_order_id' );
 		}
-		$order = wc_get_order( $order_id );
-
-		$storekey = $this->store_key;
-
-		$hashparams = $_POST["HASHPARAMS"];
-		$hashparamsval = $_POST["HASHPARAMSVAL"];
-		$hashparam = $_POST["HASH"];
-		$paramsval = '';
-		$index1 = 0;
-		$index2 = 0;
-
-		while($index1 < strlen( $hashparams ) ) {
-			$index2 = strpos( $hashparams, ":", $index1 );
-			$vl = $_POST[substr( $hashparams, $index1, $index2 - $index1 )];
-			if( $vl == null ) {
-				$vl = '';
-			}
-			$paramsval = $paramsval . $vl;
-			$index1 = $index2 + 1;
-		}
-		$hashval = $paramsval . $storekey;
-		$hash = base64_encode( pack( 'H*', sha1( $hashval ) ) );
 		$return_url = get_permalink( wc_get_page_id( 'checkout' ) );
-		$mdStatus = $_POST['mdStatus'];
-		if ( $hashparams != null ) {
-			if( $paramsval != $hashparamsval || $hashparam != $hash ){
+
+		if ( $order_id === $_POST["oid"] ) {
+			$order = wc_get_order( $order_id );
+			$mdStatus = $_POST['mdStatus'];
+
+			/** hash ver3
+			 *
+			 * Calculation is done in the same manner as in the request. Append all posted parameters in
+			 * the response in alphabetical (CI) order (A to Z) using “|” as separator and then add the
+			 * “Store Key” at the end (also using “|” as separator). This data is then hashed using SHA-512
+			 * algorithm and encoded with Base64. Fields “HASH”, “encoding” and “countdown” are ignored.
+			 *
+			 * Relevant POST fields in the bank response are already properly sorted, if this changes we'll
+			 * have to add an extra step to sort them using `natcasesort()`
+			 */
+			$params = array();
+			$ignored = array( 'hash', 'encoding', 'countdown' );
+			foreach ( $_POST as $key => $value ) {
+				if ( !in_array( strtolower( $key ), $ignored ) ) {
+					// '|' and '\' in the value have to be escaped
+					array_push( $params, str_replace( array( "\\", "|" ), array( "\\\\", "\\|" ), $value ) );
+				}
+			}
+			array_push( $params, $this->store_key );
+
+			$hash_ver3 = base64_encode( pack( 'H*', hash( 'sha512', implode( '|', $params ) ) ) );
+
+			if ( $_POST["HASH"] !== $hash_ver3 ) {
 				$order->add_order_note( __( 'Security warning. Hash values mismatch.', 'halk-payment-gateway-for-woocommerce' ) );
 				wc_add_notice( __( 'Something went wrong. Please contact us for more details.', 'halk-payment-gateway-for-woocommerce' ), 'error' );
 				// echo __( 'Security warning. Hash values mismatch.', 'halk-payment-gateway-for-woocommerce' );
@@ -213,7 +216,7 @@ class WC_Halk_Payment_Gateway extends WC_Payment_Gateway {
 				}
 			}
 		} else {
-			wc_add_notice( __( 'Hash values error. Please check parameters posted to 3D secure page.', 'halk-payment-gateway-for-woocommerce' ), 'error' );
+			wc_add_notice( __( 'Order-ID mismatch. Please check parameters posted to 3D secure page.', 'halk-payment-gateway-for-woocommerce' ), 'error' );
 		}
 		wp_safe_redirect( $return_url );
 	}
@@ -310,24 +313,32 @@ class WC_Halk_Payment_Gateway extends WC_Payment_Gateway {
 				 $instalment = '';				//Instalment count, if there's no instalment should left blank
 				 $transactionType = 'Auth';		//transaction type
 
-				 $hashstr = $clientId . $oid . $amount . $okUrl . $failUrl .$transactionType. $instalment .$rnd . $storekey;
-
-				 $hash = base64_encode(pack('H*',sha1($hashstr)));
+				/** hash ver3
+				 *
+				 * Append all posted request parameters in alphabetical (CI) order (A to Z), then add “Store Key” at
+				 * the end, using “|” as separator. Hash the result using SHA-512 algorithm and encode it with Base64.
+				 * Characters “|” and “\” should be backslash escaped if found in the parameter values.
+				 * Note: parameters “hash” and “encoding” are ignored.
+				 */
+				//fields: amount | clientid | currency | failUrl | hashAlgorithm | islemtipi | oid | okUrl | refreshtime | rnd | storetype
+				$params = array($amount, $clientId, $currencyVal, $failUrl, "ver3", $transactionType, $oid, $okUrl, "10", $rnd, $storetype, $storekey);
+				$hash = base64_encode( pack( 'H*', hash( 'sha512', implode( '|', $params ) ) ) );
 				 ?>
 			   <form name="form" id="<?php echo $this->id ; ?>-3d-secure-form" action="<?php echo $this->payment_url; ?>"
 			         method="POST">
 				   <div>
+					   <input type="hidden" name="hashAlgorithm" value="ver3" />
 					   <input type="hidden" name="clientid" value="<?php echo $clientId; ?>" />
 					   <input type="hidden" name="amount" value="<?php echo $amount; ?>" />
 					   <input type="hidden" name="islemtipi" value="<?php echo $transactionType; ?>" />
-					   <input type="hidden" name="taksit" value="<?php echo $instalment; ?>" />
+					   <!--input type="hidden" name="taksit" value="<?php echo $instalment; ?>" /-->
 					   <input type="hidden" name="oid" value="<?php echo $oid; ?>" />
 					   <input type="hidden" name="okUrl" value="<?php echo $okUrl; ?>" />
 					   <input type="hidden" name="failUrl" value="<?php echo $failUrl; ?>" />
 					   <input type="hidden" name="rnd" value="<?php echo $rnd; ?>" />
 					   <input type="hidden" name="hash" value="<?php echo $hash; ?>" />
 					   <input type="hidden" name="storetype" value="<?php echo $storetype; ?>" />
-					   <input type="hidden" name="lang" value="<?php echo $lang; ?>" />
+					   <!--input type="hidden" name="lang" value="<?php echo $lang; ?>" /-->
 					   <input type="hidden" name="currency" value="<?php echo $currencyVal; ?>" />
 					   <input type="hidden" name="refreshtime" value="10" />
 				   </div>
