@@ -1,11 +1,11 @@
 <?php
 /**
- * Plugin Name: WooCommerce Halkbank Payment Gateway - not functional after 15.03.2024
- * Plugin URI: https://wordpress.org/plugins/woo-halkbank-payment-gateway/
+ * Plugin Name: WooCommerce Halkbank Payment Gateway
+ * Plugin URI: https://github.com/miopa/woo-halkbank-payment-gateway
  * Description: Implements the Halk bank payment gateway.
  * Author: Webpigment
  * Author URI: https://www.webpigment.com/
- * Version: 1.2.1
+ * Version: 1.3
  * Text Domain: halk-payment-gateway-for-woocommerce
  * Domain Path: /i18n/languages/
  *
