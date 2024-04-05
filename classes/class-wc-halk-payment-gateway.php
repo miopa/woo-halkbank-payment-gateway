@@ -6,7 +6,7 @@
  *
  * @class 		WC_Halk_Payment_Gateway
  * @extends		WC_Payment_Gateway
- * @version		1.3
+ * @version		1.3.1
  * @package		WooCommerce/Classes/Payment
  * @author 		Mitko Kockovski
  */
@@ -19,8 +19,8 @@ class WC_Halk_Payment_Gateway extends WC_Payment_Gateway {
 		$this->id                 = 'halk_gateway';
 		$this->icon               = '';
 		$this->has_fields         = false;
-		$this->method_title       = __( 'Halk Bank Payment', 'halk-payment-gateway-for-woocommerce' );
-		$this->method_description = __( 'Allows your store to use the Halk Bank Payment method.', 'halk-payment-gateway-for-woocommerce' );
+		$this->method_title       = esc_html__( 'Halk Bank Payment', 'halk-payment-gateway-for-woocommerce' );
+		$this->method_description = esc_html__( 'Allows your store to use the Halk Bank Payment method.', 'halk-payment-gateway-for-woocommerce' );
 		$this->payment_url        = $this->get_option( 'testing_mode', 'no' ) == 'yes' ? 'https://entegrasyon.asseco-see.com.tr/fim/est3Dgate' : 'https://epay.halkbank.mk/fim/est3Dgate';
 		// Define gateway params
 		$this->store_type         = '3D_PAY_HOSTING';
@@ -57,81 +57,86 @@ class WC_Halk_Payment_Gateway extends WC_Payment_Gateway {
 		$this->form_fields = apply_filters( 'wc_halk_form_fields',
 			array(
 				'enabled' => array(
-					'title'   => __( 'Enable/Disable', 'halk-payment-gateway-for-woocommerce' ),
+					'title'   => esc_html__( 'Enable/Disable', 'halk-payment-gateway-for-woocommerce' ),
 					'type'    => 'checkbox',
-					'label'   => __( 'Enable Halk Bank Payment', 'halk-payment-gateway-for-woocommerce' ),
+					'label'   => esc_html__( 'Enable Halk Bank Payment', 'halk-payment-gateway-for-woocommerce' ),
 					'default' => 'yes'
 				),
 				'testing_mode' => array(
-					'title'   => __( 'Testing mode', 'halk-payment-gateway-for-woocommerce' ),
+					'title'   => esc_html__( 'Testing mode', 'halk-payment-gateway-for-woocommerce' ),
 					'type'    => 'checkbox',
-					'label'   => __( 'Testing the integration', 'halk-payment-gateway-for-woocommerce' ),
+					'label'   => esc_html__( 'Testing the integration', 'halk-payment-gateway-for-woocommerce' ),
 					'default' => 'no'
 				),
 				'transaction_type' => array(
-					'label'   => __( 'Transaction type', 'woocommerce' ),
+					'title'   => esc_html__( 'Transaction type', 'woocommerce' ),
 					'type'    => 'select',
 					'options' => array(
-						'Auth'        => __( 'Capture', 'woocommerce' ),
-						'PreAuth'     => __( 'Authorization', 'woocommerce' ),
+						'Auth'        => esc_html__( 'Capture', 'woocommerce' ),
+						'PreAuth'     => esc_html__( 'Authorization', 'woocommerce' ),
 					),
 					'default'     => 'Auth',
-					'description' => __( 'Use “Authorization” to allocate (reserve) funds, “Capture” for actual transfer', 'halk-payment-gateway-for-woocommerce' ),
-					'desc_tip'    => true,
+					'description' => sprintf('“%s” - %s<br>“%s” - %s',
+						esc_html__( 'Capture', 'woocommerce' ),
+						esc_html__( 'actual transfer (debit) of funds from cardholder\'s account', 'halk-payment-gateway-for-woocommerce' ),
+						esc_html__( 'Authorization', 'woocommerce' ),
+						esc_html__( 'allocate (reserve) funds on cardholder\'s account (up to 3 days)', 'halk-payment-gateway-for-woocommerce' )
+					),
+					//'desc_tip'    => true,
 				),
 				'status_transaction' => array(
 					'description' => 'Not used currently',
-					'title'   => __( 'Status Transactions', 'halk-payment-gateway-for-woocommerce' ),
+					'title'   => esc_html__( 'Status Transactions', 'halk-payment-gateway-for-woocommerce' ),
 					'type'    => 'checkbox',
-					'label'   => __( 'Enable status transactions ( needed by the bank to enable live environment )', 'halk-payment-gateway-for-woocommerce' ),
+					'label'   => esc_html__( 'Enable status transactions ( needed by the bank to enable live environment )', 'halk-payment-gateway-for-woocommerce' ),
 					'default' => 'yes'
 				),
 				'title' => array(
-					'title'       => __( 'Title', 'halk-payment-gateway-for-woocommerce' ),
+					'title'       => esc_html__( 'Title', 'halk-payment-gateway-for-woocommerce' ),
 					'type'        => 'text',
-					'description' => __( 'This controls the title for the payment method the customer sees during checkout.', 'halk-payment-gateway-for-woocommerce' ),
-					'default'     => __( 'Halk Bank Payment', 'halk-payment-gateway-for-woocommerce' ),
+					'description' => esc_html__( 'This controls the title for the payment method the customer sees during checkout.', 'halk-payment-gateway-for-woocommerce' ),
+					'default'     => sanitize_text_field(__( 'Halk Bank Payment', 'halk-payment-gateway-for-woocommerce' )),
 					'desc_tip'    => true,
 				),
 				'description' => array(
-					'title'       => __( 'Description', 'halk-payment-gateway-for-woocommerce' ),
+					'title'       => esc_html__( 'Description', 'halk-payment-gateway-for-woocommerce' ),
 					'type'        => 'textarea',
-					'description' => __( 'Payment method description that the customer will see on your checkout.', 'halk-payment-gateway-for-woocommerce' ),
-					'default'     => __( 'Please remit payment to Store Name upon pickup or delivery.', 'halk-payment-gateway-for-woocommerce' ),
+					'description' => esc_html__( 'Payment method description that the customer will see on your checkout.', 'halk-payment-gateway-for-woocommerce' ),
+					'default'     => sanitize_text_field(__( 'Please remit payment to Store Name upon pickup or delivery.', 'halk-payment-gateway-for-woocommerce' )),
 					'desc_tip'    => true,
 				),
 				'client_id' => array(
-					'title'       => __( 'Client ID', 'halk-payment-gateway-for-woocommerce' ),
+					'title'       => esc_html__( 'Client ID', 'halk-payment-gateway-for-woocommerce' ),
 					'type'        => 'text',
-					'description' => __( 'You need to ask your bank processor for this value.', 'halk-payment-gateway-for-woocommerce' ),
-					'default'     => __( '000000000', 'halk-payment-gateway-for-woocommerce' ),
+					'description' => esc_html__( 'You need to ask your bank processor for this value.', 'halk-payment-gateway-for-woocommerce' ),
+					'default'     => '000000000',
 					'desc_tip'    => true,
 				),
 				'username' => array(
-					'title'       => __( 'Username', 'halk-payment-gateway-for-woocommerce' ),
+					'title'       => esc_html__( 'Username', 'halk-payment-gateway-for-woocommerce' ),
 					'type'        => 'text',
-					'description' => __( 'You need to ask your bank processor for this value. Used only for status transaction', 'halk-payment-gateway-for-woocommerce' ),
-					'default'     => __( '000000000', 'halk-payment-gateway-for-woocommerce' ),
+					'description' => esc_html__( 'You need to ask your bank processor for this value. Used only for status transaction', 'halk-payment-gateway-for-woocommerce' ),
+					'default'     => '',
 					'desc_tip'    => true,
 				),
 				'password' => array(
-					'title'       => __( 'Password', 'halk-payment-gateway-for-woocommerce' ),
+					'title'       => esc_html__( 'Password', 'halk-payment-gateway-for-woocommerce' ),
 					'type'        => 'password',
-					'description' => __( 'You need to ask your bank processor for this value. Used only for status transaction', 'halk-payment-gateway-for-woocommerce' ),
-					'default'     => __( '000000000', 'halk-payment-gateway-for-woocommerce' ),
+					'description' => esc_html__( 'You need to ask your bank processor for this value. Used only for status transaction', 'halk-payment-gateway-for-woocommerce' ),
+					'default'     => '',
 					'desc_tip'    => true,
 				),
 				'store_key' => array(
-					'title'       => __( 'Store key', 'halk-payment-gateway-for-woocommerce' ),
+					'title'       => esc_html__( 'Store key', 'halk-payment-gateway-for-woocommerce' ),
 					'type'        => 'text',
-					'description' => __( 'You need to ask your bank processor for this value.', 'halk-payment-gateway-for-woocommerce' ),
-					'default'     => __( 'SKEY0000', 'halk-payment-gateway-for-woocommerce' ),
+					'description' => esc_html__( 'You need to ask your bank processor for this value.', 'halk-payment-gateway-for-woocommerce' ),
+					'default'     => 'SKEY0000',
 					'desc_tip'    => true,
 				),
 				'refresh_time' => array(
-					'title'       => __( 'Refresh time', 'halk-payment-gateway-for-woocommerce' ),
+					'title'       => esc_html__( 'Refresh time', 'halk-payment-gateway-for-woocommerce' ),
 					'type'        => 'number',
-					'description' => __( 'Seconds to show transaction processor result page before redirecting back to web-store', 'halk-payment-gateway-for-woocommerce' ),
+					'description' => esc_html__( 'Seconds to show transaction processor result page before redirecting back to web-store', 'halk-payment-gateway-for-woocommerce' ),
 					'default'     => 10,
 					'desc_tip'    => true,
 				),
@@ -153,7 +158,7 @@ class WC_Halk_Payment_Gateway extends WC_Payment_Gateway {
 		return array(
 			'result' => 'success',
 			'refresh' => true,
-			'messages' => "\n\t<div class=\"woocommerce-message\" role=\"alert\">" . __('Redirecting to payment page.', 'halk-payment-gateway-for-woocommerce') . "</div>\n\t",
+			'messages' => "\n\t<div class=\"woocommerce-message\" role=\"alert\">" . esc_html__('Redirecting to payment page.', 'halk-payment-gateway-for-woocommerce') . "</div>\n\t",
 		);
 	}
 

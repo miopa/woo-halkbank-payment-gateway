@@ -5,7 +5,7 @@
  * Description: Implements the Halk bank payment gateway.
  * Author: Webpigment
  * Author URI: https://www.webpigment.com/
- * Version: 1.3
+ * Version: 1.3.1
  * Text Domain: halk-payment-gateway-for-woocommerce
  * Domain Path: /i18n/languages/
  *

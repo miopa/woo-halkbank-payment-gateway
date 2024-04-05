@@ -11,7 +11,7 @@ Web URL: https://wordpress.org/plugins/woo-halkbank-payment-gateway/
 - Tested up to: 6.4.3
 - Requires WooCommerce at least: 3.2
 - Tested WooCommerce up to: 8.4.0
-- Stable Tag: 1.3
+- Stable Tag: 1.3.1
 - License: GPLv3
 - Requires PHP: 5.2.4
 - License URI: http://www.gnu.org/licenses/gpl-3.0.html
@@ -32,10 +32,18 @@ This plugin allows your store to make payments via Halk Bank payment service.
 
 == Frequently Asked Questions ==
 
+**What transaction type should I configure?**
+
+Use “*Capture*” for actual transfer (debit) of funds from the cardholder's account.  
+“*Authorization*” only allocates (reserves) the amount (check with the bank if this type is allowed for your web-store)
+
 **What is the text domain for translations?**
+
 The text domain is `halk-payment-gateway-for-woocommerce`.
 
 == Changelog ==
+
+- 1.3.1 Sanitize translations, explain transaction type options
 - **1.3** Implement hash ver3, configure refresh-time after processing, select transaction type
 - 1.2 Add live/test mode. Add transaction type.
 - 1.1.1 Clean some code.
