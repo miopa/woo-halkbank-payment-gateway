@@ -17,6 +17,13 @@ class WC_Halk_Payment_Gateway extends WC_Payment_Gateway {
 	protected $client_id, $store_key, $username, $password;
 	// user settings
 	protected $testing_mode, $refresh_time, $transaction_type, $status_transaction;
+	// Enable debug logging by specifying a log file path. It should be outside of the webroot.
+	// Debug file will contain sensitive data, keep disabled in production environments.
+	protected $debug = false;
+
+	protected function debug_log( $msg, $order_id = '*' ) {
+		error_log( date( 'Y-m-d H:i:s' ) . " [$order_id] $msg\n", 3, $this->debug );
+	}
 
 	/**
 	 * Constructor for the gateway.
@@ -189,6 +196,9 @@ class WC_Halk_Payment_Gateway extends WC_Payment_Gateway {
 		}
 		$return_url = get_permalink( wc_get_page_id( 'checkout' ) );
 
+		// debug log response from gateway
+		$this->debug && $this->debug_log( "3D response: " . print_r( $_POST, true ), $order_id );
+
 		if ( $order_id == $_POST["oid"] ) {
 			$order = wc_get_order( $order_id );
 
@@ -214,11 +224,20 @@ class WC_Halk_Payment_Gateway extends WC_Payment_Gateway {
 
 			$hash_ver3 = base64_encode( pack( 'H*', hash( 'sha512', implode( '|', $params ) ) ) );
 
-			if ( $_POST["HASH"] !== $hash_ver3 ) {
+			if ( $_POST["HASH"] !== $hash_ver3 ) { // invalid reply
 				$order->add_order_note( __( 'Security warning. Hash values mismatch.', 'halk-payment-gateway-for-woocommerce' ) );
 				wc_add_notice( __( 'Something went wrong. Please contact us for more details.', 'halk-payment-gateway-for-woocommerce' ), 'error' );
-				// echo __( 'Security warning. Hash values mismatch.', 'halk-payment-gateway-for-woocommerce' );
-			} else {
+				$this->debug && $this->debug_log( "HASH ver3: $hash_ver3", $order_id );
+
+			} elseif ( $_POST["Response"] === "Approved" ) { // successful payment
+				$order->payment_complete();
+				// this makes no sense, enable for now in testing mode for same behavior as pre-fork versions
+				if ( $this->testing_mode && $this->status_transaction ) {
+					$order->add_order_note( $this->make_test_status_transaction( $order_id ) );
+				}
+				$return_url = $this->get_return_url( $order );
+			} else { // payment failed (possible "Response" field values: “Declined” or “Error”)
+				$msg = __( 'On-line payment failed', 'halk-payment-gateway-for-woocommerce' );
 				/** Possible `mdStatus` values:
 				 * 1 = Authenticated transaction (Full 3D)
 				 * 2, 3, 4 = Card not participating or attempt (Half 3D)
@@ -226,28 +245,26 @@ class WC_Halk_Payment_Gateway extends WC_Payment_Gateway {
 				 * 0 = Authentication failed
 				 */
 				if ( in_array( $_POST['mdStatus'], array( '1', '2', '3', '4' ), true ) ) {
-					// Possible `Response` values: “Approved”, “Declined” or “Error”
-					if ( $_POST["Response"] === "Approved" ) {
-						$order->payment_complete();
-						// this makes no sense, enable for now in testing mode to have same behavior as pre-fork versions
-						if ( $this->testing_mode && $this->status_transaction ) {
-							$order->add_order_note( $this->make_test_status_transaction( $order_id ) );
-						}
-						$return_url = $this->get_return_url( $order );
+					if ( $_POST['ProcReturnCode'] === '99' ) { // Nestpay error
+						$err_info = "Nestpay {$_POST['Response']} {$_POST['ErrorCode']}: {$_POST['ErrMsg']}";
+						$err_msg = __( 'Processing error, please try again later', 'halk-payment-gateway-for-woocommerce' );
+					} elseif ($_POST['ProcReturnCode'] === '58' ) { // transaction type not allowed
+						$err_info = "Transaction type “{$_POST['islemtipi']}”: {$_POST['ErrMsg']}";
+						$err_msg = __( 'Transaction type not permitted for this store', 'halk-payment-gateway-for-woocommerce' );
 					} else {
-						$order->add_order_note( __( 'Your payment is not approved.', 'halk-payment-gateway-for-woocommerce' ) );
-						wc_add_notice( __( 'Something went wrong. Please contact us for more details.', 'halk-payment-gateway-for-woocommerce' ), 'error' );
-
-						// echo  __( 'Your payment is not approved.', 'halk-payment-gateway-for-woocommerce' );
+						$err_info = "{$_POST['Response']} {$_POST['ErrorCode']}: {$_POST['ErrMsg']}";
+						$err_msg = __( 'Refused by card issuer', 'halk-payment-gateway-for-woocommerce' );
 					}
 				} else {
-					$order->add_order_note( __( '3D authentication unsuccesful.', 'halk-payment-gateway-for-woocommerce' ) );
-					wc_add_notice( __( 'Something went wrong. Please contact us for more details.', 'halk-payment-gateway-for-woocommerce' ), 'error' );
-					// echo __( '3D authentication unsuccesful.', 'halk-payment-gateway-for-woocommerce' );
+					$err_info = "{$_POST['mdStatus']}: {$_POST['mdErrorMsg']}";
+					$err_msg = __( '3D authentication unsuccesful.', 'halk-payment-gateway-for-woocommerce' );
 				}
+
+				wc_add_notice( "$msg: $err_msg", 'error' );
+				$order->add_order_note( "On-line payment error ($err_msg)\n$err_info" );
 			}
 		} else {
-			wc_add_notice( __( 'Order-ID mismatch. Please check parameters posted to 3D secure page.', 'halk-payment-gateway-for-woocommerce' ), 'error' );
+			wc_add_notice( __( 'Something went wrong. Please contact us for more details.', 'halk-payment-gateway-for-woocommerce' ), 'error' );
 		}
 		wp_safe_redirect( $return_url );
 	}
@@ -270,11 +287,15 @@ class WC_Halk_Payment_Gateway extends WC_Payment_Gateway {
 		curl_setopt( $ch, CURLOPT_SSL_VERIFYPEER, true );
 		curl_setopt($ch, CURLOPT_POSTFIELDS, $request);
 
+		$this->debug && $this->debug_log( "POST CC5Request: {$this->api_url}", $order_id );
+
 		$result = curl_exec($ch);
 
 		if (curl_errno($ch)) {
+			$this->debug && $this->debug_log( 'CC5Request error: ' . curl_error( $ch ), $order_id );
 			print curl_error($ch);
 		} else {
+			$this->debug && $this->debug_log( 'CC5Request OK: ' . $result, $order_id );
 			curl_close($ch);
 		}
 		return $result;
@@ -340,6 +361,8 @@ class WC_Halk_Payment_Gateway extends WC_Payment_Gateway {
 				//fields: amount | clientid | currency | failUrl | hashAlgorithm | islemtipi | oid | okUrl | refreshtime | rnd | storetype
 				$params = array( $amount, $this->client_id, $this->currency_code, $failUrl, $this->hash_alg, $this->transaction_type, $order_id, $okUrl, $this->refresh_time, $rnd, $this->store_type, $this->store_key );
 				$hash = base64_encode( pack( 'H*', hash( 'sha512', implode( '|', $params ) ) ) );
+
+				$this->debug && $this->debug_log( "POST 3D: {$this->payment_url}", $order_id );
 				 ?>
 			   <form name="form" id="<?php echo $this->id; ?>-3d-secure-form" action="<?php echo $this->payment_url; ?>" method="POST">
 				   <div>
