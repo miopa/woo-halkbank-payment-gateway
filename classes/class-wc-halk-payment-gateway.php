@@ -8,9 +8,16 @@
  * @extends		WC_Payment_Gateway
  * @version		1.3.1
  * @package		WooCommerce/Classes/Payment
- * @author 		Mitko Kockovski
+ * @author 		Mitko Kockovski, Damjan Janevski
  */
 class WC_Halk_Payment_Gateway extends WC_Payment_Gateway {
+	// gateway settings
+	protected $payment_url, $api_url, $store_type, $hash_alg, $currency_code;
+	// store settings
+	protected $client_id, $store_key, $username, $password;
+	// user settings
+	protected $testing_mode, $refresh_time, $transaction_type, $status_transaction;
+
 	/**
 	 * Constructor for the gateway.
 	 */
@@ -21,8 +28,12 @@ class WC_Halk_Payment_Gateway extends WC_Payment_Gateway {
 		$this->has_fields         = false;
 		$this->method_title       = esc_html__( 'Halk Bank Payment', 'halk-payment-gateway-for-woocommerce' );
 		$this->method_description = esc_html__( 'Allows your store to use the Halk Bank Payment method.', 'halk-payment-gateway-for-woocommerce' );
-		$this->payment_url        = $this->get_option( 'testing_mode', 'no' ) == 'yes' ? 'https://entegrasyon.asseco-see.com.tr/fim/est3Dgate' : 'https://epay.halkbank.mk/fim/est3Dgate';
+
+		$this->testing_mode       = $this->get_option( 'testing_mode', 'no' ) === 'yes';
 		// Define gateway params
+		$bank_endpoint            = $this->testing_mode ? 'entegrasyon.asseco-see.com.tr' : 'epay.halkbank.mk';
+		$this->payment_url        = "https://$bank_endpoint/fim/est3Dgate";
+		$this->api_url            = "https://$bank_endpoint/fim/api";
 		$this->store_type         = '3D_PAY_HOSTING';
 		$this->hash_alg           = 'ver3';
 		$this->currency_code      = '807'; // MKD, ISO_4217 standard
@@ -38,7 +49,7 @@ class WC_Halk_Payment_Gateway extends WC_Payment_Gateway {
 		$this->username     = $this->get_option( 'username' );
 		$this->password     = $this->get_option( 'password' );
 		$this->refresh_time = $this->get_option( 'refresh_time', '10' );
-		//$this->status_transaction     = $this->get_option( 'status_transaction', 'yes' ) === 'yes';
+		$this->status_transaction     = $this->get_option( 'status_transaction', 'yes' ) === 'yes';
 		$this->transaction_type       = $this->get_option( 'transaction_type', 'Auth' );
 
 		// Actions.
@@ -85,7 +96,7 @@ class WC_Halk_Payment_Gateway extends WC_Payment_Gateway {
 					//'desc_tip'    => true,
 				),
 				'status_transaction' => array(
-					'description' => 'Not used currently',
+					'description' => 'Used only in testing mode',
 					'title'   => esc_html__( 'Status Transactions', 'halk-payment-gateway-for-woocommerce' ),
 					'type'    => 'checkbox',
 					'label'   => esc_html__( 'Enable status transactions ( needed by the bank to enable live environment )', 'halk-payment-gateway-for-woocommerce' ),
@@ -113,14 +124,14 @@ class WC_Halk_Payment_Gateway extends WC_Payment_Gateway {
 					'desc_tip'    => true,
 				),
 				'username' => array(
-					'title'       => esc_html__( 'Username', 'halk-payment-gateway-for-woocommerce' ),
+					'title'       => esc_html__( 'API Username', 'halk-payment-gateway-for-woocommerce' ),
 					'type'        => 'text',
 					'description' => esc_html__( 'You need to ask your bank processor for this value. Used only for status transaction', 'halk-payment-gateway-for-woocommerce' ),
 					'default'     => '',
 					'desc_tip'    => true,
 				),
 				'password' => array(
-					'title'       => esc_html__( 'Password', 'halk-payment-gateway-for-woocommerce' ),
+					'title'       => esc_html__( 'API Password', 'halk-payment-gateway-for-woocommerce' ),
 					'type'        => 'password',
 					'description' => esc_html__( 'You need to ask your bank processor for this value. Used only for status transaction', 'halk-payment-gateway-for-woocommerce' ),
 					'default'     => '',
@@ -218,10 +229,10 @@ class WC_Halk_Payment_Gateway extends WC_Payment_Gateway {
 					// Possible `Response` values: “Approved”, “Declined” or “Error”
 					if ( $_POST["Response"] === "Approved" ) {
 						$order->payment_complete();
-						/* this makes no sense, skip for now
-						if ( $this->status_transaction ) {
+						// this makes no sense, enable for now in testing mode to have same behavior as pre-fork versions
+						if ( $this->testing_mode && $this->status_transaction ) {
 							$order->add_order_note( $this->make_test_status_transaction( $order_id ) );
-						}*/
+						}
 						$return_url = $this->get_return_url( $order );
 					} else {
 						$order->add_order_note( __( 'Your payment is not approved.', 'halk-payment-gateway-for-woocommerce' ) );
@@ -243,27 +254,20 @@ class WC_Halk_Payment_Gateway extends WC_Payment_Gateway {
 
 	protected function make_test_status_transaction( $order_id ) {
 
-		$clientid = $this->store_key;
-		$name = $this->username;
-		$password = $this->password;
-		$oid= $order_id;
-
 		$request= "DATA=<?xml version=\"1.0\" encoding=\"ISO-8859-9\"?>
 		<CC5Request>
-		<Name>{$name}</Name>
-		<Password>{$password}</Password>
-		<ClientId>{$clientid}</ClientId>
-		<OrderId>{$order_id}</OrderId>	
-		<Mode>P</Mode>
+		<Name>{$this->username}</Name>
+		<Password>{$this->password}</Password>
+		<ClientId>{$this->client_id}</ClientId>
+		<OrderId>{$order_id}</OrderId>
 		<Extra><ORDERSTATUS>QUERY</ORDERSTATUS></Extra>
 		</CC5Request>";
 
-		$url = "https://entegrasyon.asseco-see.com.tr/fim/api";
 		$ch = curl_init();
-		curl_setopt($ch, CURLOPT_URL,$url);
+		curl_setopt( $ch, CURLOPT_URL, $this->api_url );
 		curl_setopt($ch, CURLOPT_RETURNTRANSFER,1);
 		curl_setopt($ch, CURLOPT_TIMEOUT, 90);
-		curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+		curl_setopt( $ch, CURLOPT_SSL_VERIFYPEER, true );
 		curl_setopt($ch, CURLOPT_POSTFIELDS, $request);
 
 		$result = curl_exec($ch);
@@ -354,6 +358,7 @@ class WC_Halk_Payment_Gateway extends WC_Payment_Gateway {
 					   <!--input type="hidden" name="lang" value="<?php //echo $lang; ?>" /-->
 					   <input type="hidden" name="currency" value="<?php echo $this->currency_code; ?>" />
 					   <input type="hidden" name="refreshtime" value="<?php echo $this->refresh_time; ?>" />
+					   <input type="hidden" name="encoding" value="UTF-8" />
 				   </div>
 			   </form>
 			   <script>
