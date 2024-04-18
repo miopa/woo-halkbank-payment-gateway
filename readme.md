@@ -43,7 +43,7 @@ The text domain is `halk-payment-gateway-for-woocommerce`.
 
 == Changelog ==
 
-- 1.3.1 Sanitize translations, explain transaction type options, improved error messages
+- 1.3.1 Sanitize translations, explain transaction type options, improved error messages, set gateway language
 - **1.3** Implement hash ver3, configure refresh-time after processing, select transaction type
 - 1.2 Add live/test mode. Add transaction type.
 - 1.1.1 Clean some code.

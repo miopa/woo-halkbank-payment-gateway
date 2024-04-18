@@ -12,7 +12,7 @@
  */
 class WC_Halk_Payment_Gateway extends WC_Payment_Gateway {
 	// gateway settings
-	protected $payment_url, $api_url, $store_type, $hash_alg, $currency_code;
+	protected $payment_url, $api_url, $store_type, $hash_alg, $currency_code, $languages;
 	// store settings
 	protected $client_id, $store_key, $username, $password;
 	// user settings
@@ -45,6 +45,7 @@ class WC_Halk_Payment_Gateway extends WC_Payment_Gateway {
 		$this->store_type         = '3D_PAY_HOSTING';
 		$this->hash_alg           = 'ver3';
 		$this->currency_code      = '807'; // MKD, ISO_4217 standard
+		$this->languages          = array( 'mk', 'en' ); // languages supported by gateway
 		// Load the settings.
 		$this->init_form_fields();
 		$this->init_settings();
@@ -157,6 +158,25 @@ class WC_Halk_Payment_Gateway extends WC_Payment_Gateway {
 					'type'        => 'number',
 					'description' => esc_html__( 'Seconds to show transaction processor result page before redirecting back to web-store', 'halk-payment-gateway-for-woocommerce' ),
 					'default'     => 10,
+					'desc_tip'    => true,
+				),
+				'lang' => array(
+					'title'       => esc_html__( 'Language' ),
+					'type'        => 'select',
+					'options'     => array(
+						''    => esc_html__( 'Gateway default', 'halk-payment-gateway-for-woocommerce' ),
+						'mk'  => esc_html__( 'Macedonian' ),
+						'en'  => esc_html__( 'English' ),
+					),
+					'default'     => 'en', // for same behavior as pre-fork versions
+					'description' => esc_html__( 'Language of payment gateway pages', 'halk-payment-gateway-for-woocommerce' ),
+				),
+				'lang_override' => array(
+					'title'       => esc_html__( 'Language override', 'halk-payment-gateway-for-woocommerce' ),
+					'type'        => 'checkbox',
+					'label'       => esc_html__( 'Use active web-site language when possible', 'halk-payment-gateway-for-woocommerce' ),
+					'default'     => 'yes',
+					'description' => esc_html__( 'Override previous setting when currently used web-site language is supported by the gateway', 'halk-payment-gateway-for-woocommerce' ),
 					'desc_tip'    => true,
 				),
 			)
@@ -274,6 +294,20 @@ class WC_Halk_Payment_Gateway extends WC_Payment_Gateway {
 		wp_safe_redirect( $return_url );
 	}
 
+	/**
+	 * The display language of the 3D-Pay form, determined from plugin preferences and current web-site locale
+	 */
+	protected function get_lang() {
+
+		if ( $this->get_option( 'lang_override' ) === 'yes' ) {
+			$current_lang = substr( get_user_locale(), 0, 2 );
+			if ( in_array( $current_lang, $this->languages, true ) ) {
+				return $current_lang;
+			}
+		}
+		return $this->get_option( 'lang' );
+	}
+
 	protected function make_test_status_transaction( $order_id ) {
 
 		$request= "DATA=<?xml version=\"1.0\" encoding=\"ISO-8859-9\"?>
@@ -370,7 +404,6 @@ class WC_Halk_Payment_Gateway extends WC_Payment_Gateway {
 				 $failUrl = $okUrl = get_site_url() . '/?wc-api=' . esc_attr( $this->id ) . '&order=' . $order_id;
 				 $amount = number_format( apply_filters( 'halk_amount_fix', $order->get_total() ),  2, '.', '' );  //Transaction amount
 				 $rnd = microtime();				//A random number, such as date/time
-				 //$lang = 'en';					//Language parameter, 'tr' for Turkish (default), 'en' for English
 				 //$instalment = '';				//Instalment count, if there's no instalment should left blank
 
 				/** hash ver3
@@ -380,8 +413,8 @@ class WC_Halk_Payment_Gateway extends WC_Payment_Gateway {
 				 * Characters “|” and “\” should be backslash escaped if found in the parameter values.
 				 * Note: parameters “hash” and “encoding” are ignored.
 				 */
-				//fields: amount | clientid | currency | failUrl | hashAlgorithm | islemtipi | oid | okUrl | refreshtime | rnd | storetype
-				$params = array( $amount, $this->client_id, $this->currency_code, $failUrl, $this->hash_alg, $this->transaction_type, $order_id, $okUrl, $this->refresh_time, $rnd, $this->store_type, $this->store_key );
+				//fields: amount | clientid | currency | failUrl | hashAlgorithm | islemtipi | lang | oid | okUrl | refreshtime | rnd | storetype
+				$params = array( $amount, $this->client_id, $this->currency_code, $failUrl, $this->hash_alg, $this->transaction_type, $this->get_lang(), $order_id, $okUrl, $this->refresh_time, $rnd, $this->store_type, $this->store_key );
 				$hash = base64_encode( pack( 'H*', hash( 'sha512', implode( '|', $params ) ) ) );
 
 				$this->debug && $this->debug_log( "POST 3D: {$this->payment_url}", $order_id );
@@ -400,7 +433,7 @@ class WC_Halk_Payment_Gateway extends WC_Payment_Gateway {
 					   <input type="hidden" name="rnd" value="<?php echo $rnd; ?>" />
 					   <input type="hidden" name="hash" value="<?php echo $hash; ?>" />
 					   <input type="hidden" name="storetype" value="<?php echo $this->store_type; ?>" />
-					   <!--input type="hidden" name="lang" value="<?php //echo $lang; ?>" /-->
+					   <input type="hidden" name="lang" value="<?php echo $this->get_lang(); ?>" />
 					   <input type="hidden" name="currency" value="<?php echo $this->currency_code; ?>" />
 					   <input type="hidden" name="refreshtime" value="<?php echo $this->refresh_time; ?>" />
 					   <input type="hidden" name="encoding" value="UTF-8" />
