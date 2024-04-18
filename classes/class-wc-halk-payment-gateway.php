@@ -17,12 +17,13 @@ class WC_Halk_Payment_Gateway extends WC_Payment_Gateway {
 	protected $client_id, $store_key, $username, $password;
 	// user settings
 	protected $testing_mode, $refresh_time, $transaction_type, $status_transaction;
+
 	// Enable debug logging by specifying a log file path. It should be outside of the webroot.
 	// Debug file will contain sensitive data, keep disabled in production environments.
 	protected $debug = false;
 
 	protected function debug_log( $msg, $order_id = '*' ) {
-		error_log( date( 'Y-m-d H:i:s' ) . " [$order_id] $msg\n", 3, $this->debug );
+		error_log( date( 'Y-m-d H:i:s' ) . " ~ {$this->customer_ip()} [$order_id] $msg\n", 3, $this->debug );
 	}
 
 	/**
@@ -216,6 +217,8 @@ class WC_Halk_Payment_Gateway extends WC_Payment_Gateway {
 			$ignored = array( 'hash', 'encoding', 'countdown' );
 			foreach ( $_POST as $key => $value ) {
 				if ( ! in_array( strtolower( $key ), $ignored ) ) {
+					// It's not clear what should be escaped/unescaped in the response, this works for now
+					$value = stripslashes( $value );
 					// '|' and '\' in the value have to be escaped
 					array_push( $params, str_replace( array( "\\", "|" ), array( "\\\\", "\\|" ), $value ) );
 				}
@@ -256,7 +259,9 @@ class WC_Halk_Payment_Gateway extends WC_Payment_Gateway {
 						$err_msg = __( 'Refused by card issuer', 'halk-payment-gateway-for-woocommerce' );
 					}
 				} else {
-					$err_info = "{$_POST['mdStatus']}: {$_POST['mdErrorMsg']}";
+					$err_info = isset( $_POST['mdStatus'] )
+						? "{$_POST['mdStatus']}: {$_POST['mdErrorMsg']}"
+						: "{$_POST['ErrorCode']}: {$_POST['ErrMsg']}";
 					$err_msg = __( '3D authentication unsuccesful.', 'halk-payment-gateway-for-woocommerce' );
 				}
 
@@ -299,6 +304,23 @@ class WC_Halk_Payment_Gateway extends WC_Payment_Gateway {
 			curl_close($ch);
 		}
 		return $result;
+	}
+
+	/**
+	 * Get IP address data of customer
+	 * Note: used only for debug
+	 */
+	protected function customer_ip() {
+
+		$ip = array();
+		// handle possible reverse proxy
+		if ( ! empty( $_SERVER['HTTP_X_FORWARDED_FOR'] ) && $_SERVER['HTTP_X_FORWARDED_FOR'] !== $_SERVER['REMOTE_ADDR'] ) {
+			$ip[] = $_SERVER['HTTP_X_FORWARDED_FOR'];
+		}
+		if ( count( $ip ) === 0 || filter_var( $_SERVER['REMOTE_ADDR'], FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE ) ) {
+			$ip[] = $_SERVER['REMOTE_ADDR'];
+		}
+		return implode( '/', $ip );
 	}
 
 	/**
